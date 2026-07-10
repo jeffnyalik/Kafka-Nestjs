@@ -80,11 +80,12 @@ export class KafkaProducerService implements OnApplicationBootstrap, OnModuleDes
         }
 
         try {
-            await this.producer.send({
+            const result = await this.producer.send({
                 topic,
                 messages: [{ value: JSON.stringify(message) }],
             });
             this.logger.debug(`Message published to topic: ${topic}`);
+            this.logger.debug(JSON.stringify(result));
         } catch (error) {
             this.isConnected = false;
             this.logger.error(`Error publishing message to topic: ${topic}`);

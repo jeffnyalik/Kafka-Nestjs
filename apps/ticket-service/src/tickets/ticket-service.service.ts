@@ -15,7 +15,7 @@ export class TicketServiceService {
       title: dto.title,
       description: dto.description,
       priority: dto.priority,
-      occuredAt: new Date()
+      occurredAt: new Date()
     };
 
     await this.kafkaProducer.publish(KAFKA_TOPICS.TICKET_EVENTS, event);

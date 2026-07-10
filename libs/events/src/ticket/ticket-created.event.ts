@@ -5,5 +5,5 @@ export class TicketCreatedEvent{
     title: string;
     description: string;
     priority: string;
-    occuredAt: Date; //tells the consumer when the event occured.
+    occurredAt: Date; //tells the consumer when the event occured.
 }
