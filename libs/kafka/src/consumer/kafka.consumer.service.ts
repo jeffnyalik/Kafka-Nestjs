@@ -12,11 +12,13 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
     private readonly kafka: Kafka;
     private readonly consumer: Consumer;
     private readonly handlers = new Map<string, (message: unknown) => Promise<void>>();
+    private readonly subscribedTopics = new Set<string>();
 
     private isConnected = false;
     private isRunning = false;
     private destroyed = false;
     private reconnectTimer?: NodeJS.Timeout;
+    private connecting: Promise<boolean> | null = null;
 
     constructor(
         @Inject(KAFKA_MODULE_OPTIONS)
@@ -35,24 +37,43 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
     }
 
     onApplicationBootstrap() {
-        void this.connect();
+        void this.ensureConnected();
     }
 
-    private async connect(): Promise<void> {
+    private ensureConnected(): Promise<boolean> {
+        if (this.isConnected) {
+            return Promise.resolve(true);
+        }
+
+        if (!this.connecting) {
+            this.connecting = this.connect();
+        }
+
+        return this.connecting;
+    }
+
+    private async connect(): Promise<boolean> {
         if (this.destroyed || this.isConnected) {
-            return;
+            return this.isConnected;
         }
 
         try {
             await this.consumer.connect();
             this.isConnected = true;
             this.logger.log('Kafka consumer is connected');
+            await this.activateSubscriptions();
+            return true;
         } catch (error) {
             this.isConnected = false;
+            this.subscribedTopics.clear();
+            this.isRunning = false;
             this.logger.warn(
                 `Kafka consumer is unavailable (${error instanceof Error ? error.message : error}), retrying in ${RECONNECT_DELAY_MS / 1000}s`,
             );
             this.scheduleReconnect();
+            return false;
+        } finally {
+            this.connecting = null;
         }
     }
 
@@ -63,8 +84,42 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
 
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = undefined;
-            void this.connect();
+            void this.ensureConnected();
         }, RECONNECT_DELAY_MS);
+    }
+
+    private async activateSubscriptions(): Promise<void> {
+        for (const topic of this.handlers.keys()) {
+            await this.addTopicSubscription(topic);
+        }
+    }
+
+    private async addTopicSubscription(topic: string): Promise<void> {
+        if (this.subscribedTopics.has(topic)) {
+            return;
+        }
+
+        await this.consumer.subscribe({ topic, fromBeginning: true });
+        this.subscribedTopics.add(topic);
+
+        if (!this.isRunning) {
+            this.isRunning = true;
+            await this.consumer.run({
+                eachMessage: async ({ topic: messageTopic, message }) => {
+                    if (!message.value) {
+                        return;
+                    }
+
+                    const topicHandler = this.handlers.get(messageTopic);
+                    if (!topicHandler) {
+                        return;
+                    }
+
+                    const payload = JSON.parse(message.value.toString());
+                    await topicHandler(payload);
+                },
+            });
+        }
     }
 
     async onModuleDestroy() {
@@ -93,6 +148,7 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
             );
         } finally {
             this.isConnected = false;
+            this.subscribedTopics.clear();
             this.handlers.clear();
         }
     }
@@ -101,33 +157,15 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
         topic: string,
         handler: (message: unknown) => Promise<void>,
     ): Promise<void> {
-        if (!this.isConnected) {
-            this.logger.warn(`Cannot subscribe to topic ${topic}: Kafka consumer is not connected`);
-            throw new Error('Kafka consumer is not connected');
-        }
-
         this.handlers.set(topic, handler);
-        await this.consumer.subscribe({ topic, fromBeginning: true });
 
-        if (!this.isRunning) {
-            this.isRunning = true;
-            await this.consumer.run({
-                eachMessage: async ({ topic: messageTopic, message }) => {
-                    if (!message.value) {
-                        return;
-                    }
-
-                    const topicHandler = this.handlers.get(messageTopic);
-                    if (!topicHandler) {
-                        return;
-                    }
-
-                    const payload = JSON.parse(message.value.toString());
-                    await topicHandler(payload);
-                },
-            });
+        const connected = await this.ensureConnected();
+        if (!connected) {
+            this.logger.warn(`Subscription to ${topic} queued until Kafka consumer connects`);
+            return;
         }
 
+        await this.addTopicSubscription(topic);
         this.logger.log(`Subscribed to topic ${topic}`);
     }
 
