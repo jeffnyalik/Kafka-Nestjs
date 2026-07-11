@@ -5,7 +5,10 @@ import { TicketServiceController } from "./tickets/ticket-service.controller";
 
 @Module({
     imports: [
-        KafkaModule
+        KafkaModule.register({
+            clientId: 'ticket-service',
+            brokers: ['localhost:9092'],
+        })
     ],
     controllers: [TicketServiceController],
     providers: [TicketServiceService]

@@ -1,20 +1,32 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
-import { Kafka, Producer } from "kafkajs";
-import { kafkaConfig } from "../config/kafka.config";
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { Kafka, Producer } from 'kafkajs';
+import { KAFKA_MODULE_OPTIONS } from '../constants/kafka.constants';
+import type { KafkaModuleOptions } from '../interfaces/kafka-module-options.interface';
 
 const RECONNECT_DELAY_MS = 5000;
+const DEFAULT_RETRY = { retries: 2, initialRetryTime: 100 };
 
 @Injectable()
 export class KafkaProducerService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly logger = new Logger(KafkaProducerService.name);
-
-    private readonly kafka = new Kafka(kafkaConfig);
-
-    private readonly producer: Producer = this.kafka.producer();
+    private readonly kafka: Kafka;
+    private readonly producer: Producer;
 
     private isConnected = false;
     private destroyed = false;
     private reconnectTimer?: NodeJS.Timeout;
+
+    constructor(
+        @Inject(KAFKA_MODULE_OPTIONS)
+        private readonly options: KafkaModuleOptions,
+    ) {
+        this.kafka = new Kafka({
+            clientId: this.options.clientId,
+            brokers: this.options.brokers,
+            retry: this.options.retry ?? DEFAULT_RETRY,
+        });
+        this.producer = this.kafka.producer();
+    }
 
     onApplicationBootstrap() {
         void this.connect();
@@ -80,12 +92,11 @@ export class KafkaProducerService implements OnApplicationBootstrap, OnModuleDes
         }
 
         try {
-            const result = await this.producer.send({
+            await this.producer.send({
                 topic,
                 messages: [{ value: JSON.stringify(message) }],
             });
             this.logger.debug(`Message published to topic: ${topic}`);
-            this.logger.debug(JSON.stringify(result));
         } catch (error) {
             this.isConnected = false;
             this.logger.error(`Error publishing message to topic: ${topic}`);
