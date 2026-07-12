@@ -11,7 +11,8 @@ import { CreateTicketDto } from './dto/create-ticket.dto';
 @Injectable()
 export class TicketServiceService {
     constructor(private readonly kafkaProducer: KafkaProducerService) {}
-
+    
+    //create ticket
     async createTicket(dto: CreateTicketDto) {
         const ticketId = randomUUID();
         const event: TicketEventEnvelope<TicketCreatedPayload> = {
@@ -33,4 +34,7 @@ export class TicketServiceService {
             ticketId,
         };
     }
+
+    //assign ticket to user
+    
 }
