@@ -1,9 +1,5 @@
-export class TicketCreatedEvent{
-    eventId: string; //unique identifier for the event
-    ticketId: string; //identify the business entity
-
+export interface TicketCreatedPayload {
     title: string;
-    description: string;
-    priority: string;
-    occurredAt: Date; //tells the consumer when the event occured.
+    description?: string;
+    priority?: string;
 }

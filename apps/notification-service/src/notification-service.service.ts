@@ -1,6 +1,6 @@
 import { KAFKA_TOPICS, KafkaConsumerService } from '@app/kafka';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { TicketCreatedEvent } from '@app/events/ticket/ticket-created.event';
+import { TicketEventDispatcher } from './handlers/ticket-event.dispatcher';
 
 @Injectable()
 export class NotificationServiceService implements OnApplicationBootstrap {
@@ -8,23 +8,16 @@ export class NotificationServiceService implements OnApplicationBootstrap {
 
     constructor(
         private readonly kafkaConsumerService: KafkaConsumerService,
+        private readonly ticketEventDispatcher: TicketEventDispatcher,
     ) {}
 
     async onApplicationBootstrap() {
         await this.kafkaConsumerService.subscribe(
             KAFKA_TOPICS.TICKET_EVENTS,
-            async (message: unknown) => {
-                const event = message as TicketCreatedEvent;
-                this.logger.log(
-                    `Consumed event from Kafka [topic=${KAFKA_TOPICS.TICKET_EVENTS}] ` +
-                    `eventId=${event.eventId} ticketId=${event.ticketId} ` +
-                    `title="${event.title}" priority=${event.priority ?? 'n/a'} ` +
-                    `occurredAt=${event.occurredAt}`,
-                );
-            },
+            async (message) => this.ticketEventDispatcher.dispatch(message),
         );
 
-        this.logger.log(`Listening for events on topic "${KAFKA_TOPICS.TICKET_EVENTS}"`);
+        this.logger.log(`Listening for ticket events on topic "${KAFKA_TOPICS.TICKET_EVENTS}"`);
     }
 
     getHello(): string {

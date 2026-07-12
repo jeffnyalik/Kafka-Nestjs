@@ -99,7 +99,7 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
             return;
         }
 
-        await this.consumer.subscribe({ topic, fromBeginning: true });
+        await this.consumer.subscribe({ topic, fromBeginning: false });
         this.subscribedTopics.add(topic);
 
         if (!this.isRunning) {
