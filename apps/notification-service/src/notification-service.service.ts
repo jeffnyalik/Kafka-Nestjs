@@ -15,9 +15,16 @@ export class NotificationServiceService implements OnApplicationBootstrap {
             KAFKA_TOPICS.TICKET_EVENTS,
             async (message: unknown) => {
                 const event = message as TicketCreatedEvent;
-                this.logger.log(`Ticket created: ${event.ticketId} - ${event.title}`);
+                this.logger.log(
+                    `Consumed event from Kafka [topic=${KAFKA_TOPICS.TICKET_EVENTS}] ` +
+                    `eventId=${event.eventId} ticketId=${event.ticketId} ` +
+                    `title="${event.title}" priority=${event.priority ?? 'n/a'} ` +
+                    `occurredAt=${event.occurredAt}`,
+                );
             },
         );
+
+        this.logger.log(`Listening for events on topic "${KAFKA_TOPICS.TICKET_EVENTS}"`);
     }
 
     getHello(): string {

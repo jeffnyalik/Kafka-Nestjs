@@ -105,7 +105,7 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
         if (!this.isRunning) {
             this.isRunning = true;
             await this.consumer.run({
-                eachMessage: async ({ topic: messageTopic, message }) => {
+                eachMessage: async ({ topic: messageTopic, partition, message }) => {
                     if (!message.value) {
                         return;
                     }
@@ -114,6 +114,10 @@ export class KafkaConsumerService implements OnApplicationBootstrap, OnModuleDes
                     if (!topicHandler) {
                         return;
                     }
+
+                    this.logger.log(
+                        `Received message [topic=${messageTopic} partition=${partition} offset=${message.offset}]`,
+                    );
 
                     const payload = JSON.parse(message.value.toString());
                     await topicHandler(payload);
