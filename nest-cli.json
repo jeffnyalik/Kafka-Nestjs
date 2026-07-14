@@ -10,6 +10,24 @@
   "monorepo": true,
   "root": "apps/ticket-platform",
   "projects": {
+    "analytics-service": {
+      "type": "application",
+      "root": "apps/analytics-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/analytics-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/analytics-service/tsconfig.app.json"
+      }
+    },
+    "audit-service": {
+      "type": "application",
+      "root": "apps/audit-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/audit-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/audit-service/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",
